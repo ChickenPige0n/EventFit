@@ -11,6 +11,8 @@ namespace EventFitter
 {
     public partial class MainForm : Form
     {
+        const double PRECISION = 1.0;
+
         int lineIndex;
 
         RPEChart? chart;
@@ -98,71 +100,96 @@ namespace EventFitter
                     break;
             }
             
+            
+
+
+
+
+            //RemoveRange 包括index上的事件
+
+            //移除静态事件
+            int i;
+            for (i = 1; i < Events.Count - 1; i++)
+            {
+                if (Events[i].GetMontonicity() == 0 && (Events[i - 1].end == Events[i].start))
+                {
+                    Events.RemoveRange(i, 1);
+                    i -= 1;
+                }
+            }
+
+            if (Events[0].GetMontonicity()==0)
+            {
+                Events.RemoveAt(0);
+            }
+
+            List<Double[]> cuttedEventsIndex = new List<double[]> { };
+
             int baseIndex = 0;
 
-            double precision = 1;
 
+            int Length;
 
-            int indexStepLength = 1;
-            int maxWindowLength = 128;
-            int originWindowLength = 3;
-
-
-
-            int fitWindowLength = originWindowLength;
-
-
-
-
+            //选出单调性突变的事件组
             while (baseIndex < Events.Count)
             {
-                int i;
-                for (i = 1; i + baseIndex < Events.Count - 1; i++)
+                int lastMontonicity;
+                for (Length = 1;baseIndex+Length<Events.Count-1 ; Length++)
                 {
-                    if (Events[baseIndex + i].GetMontonicity() == 0 && (Events[baseIndex + i - 1].end == Events[baseIndex + i].start))
+                    lastMontonicity = Events[baseIndex+Length-1].GetMontonicity();
+                    if (Events[baseIndex + Length].GetMontonicity()!=lastMontonicity)
                     {
-                        Events.RemoveRange(baseIndex + i, 1);
+                        cuttedEventsIndex.Add(new double[2] {baseIndex, baseIndex+Length-1});
                     }
                 }
+                baseIndex+=Length;
+            }
 
-
-                double[] values;
-                double[] beatTimes;
-                double beatTimeRange;
-                GetEventInRange(Events, baseIndex, fitWindowLength, out values, out beatTimes, out beatTimeRange);
-
-                int EaseIndex = TryFitInRange(values, beatTimes, beatTimeRange, precision);
-                if (EaseIndex != -1)
+            foreach (double[] indexes in cuttedEventsIndex)
+            {
+                float lastSpeed;
+                for(int idx = indexes[0]+1; idx <= indexes[1];idx++)
                 {
-                    RPEEvent fittedEvent = new RPEEvent();
-                    fittedEvent.start = Events[baseIndex].start;
-                    fittedEvent.end = Events[baseIndex + fitWindowLength - 1].end;
-                    fittedEvent.startTime = Events[baseIndex].startTime;
-                    fittedEvent.endTime = Events[baseIndex + fitWindowLength - 1].endTime;
-                    fittedEvent.easingType = EaseIndex;
-
-                    ReplaceEvent(fittedEvent, baseIndex, fitWindowLength, ref Events);
-                    baseIndex += 1;
-                    fitWindowLength = originWindowLength;
-
+                    lastSpeed = Events[idx - 1].getSpeed();
+                    if (Events[idx].getSpeed() - lastSpeed)
+                    {
+                        ////////////dooooooooooooooooooooo STTTTTTTTTTHHhhhhing
+                        ///上课去了
+                    }
                 }
-                else if (fitWindowLength < maxWindowLength)
-                {
-                    fitWindowLength += 4;
-                }
-                else
-                {
-                    baseIndex += indexStepLength;
-                    fitWindowLength = originWindowLength;
-                }
-
+                Events[]
             }
         }
 
+        private void NiheInRange(int baseIndex,int Length,out List<RPEEvent> Events)
+        {
+            double[] values;
+            double[] beatTimes;
+            double beatTimeRange;
+
+            Events = new List<RPEEvent>();
+
+            GetEventInRange(Events, baseIndex, Length, out values, out beatTimes, out beatTimeRange);
+
+            int EaseIndex = TryFitInRange(values, beatTimes, beatTimeRange, PRECISION);
+            if (EaseIndex != -1)
+            {
+                RPEEvent fittedEvent = new RPEEvent();
+                fittedEvent.start = Events[baseIndex].start;
+                fittedEvent.end = Events[baseIndex + Length - 1].end;
+                fittedEvent.startTime = Events[baseIndex].startTime;
+                fittedEvent.endTime = Events[baseIndex + Length - 1].endTime;
+                fittedEvent.easingType = EaseIndex;
+
+                ReplaceEvent(fittedEvent, baseIndex, Length, out Events);
+            }
+        }
+
+
+
+
         private void GetEventInRange(List<RPEEvent> Events, int baseIndex, int eventCount, out double[] values, out double[] beatTimes, out double beatTimeRange)
         {
-            double endTime;
-            double startTime;
             values = new double[eventCount];
             beatTimes = new double[eventCount];
             beatTimeRange = -getTime(Events[baseIndex].startTime)
@@ -171,9 +198,7 @@ namespace EventFitter
             for (int outIndex = baseIndex; outIndex < baseIndex + eventCount; outIndex++)
             {
                 values[outIndex - baseIndex] = Events[outIndex].start;
-                endTime = getTime(Events[outIndex].endTime);
-                startTime = getTime(Events[outIndex].startTime);
-                beatTimes[outIndex - baseIndex] = endTime - startTime;
+                beatTimes[outIndex - baseIndex] = Events[outIndex].getDuration();
             }
 
             values[eventCount - 1] = Events[baseIndex + eventCount - 1].end;
@@ -182,7 +207,7 @@ namespace EventFitter
         //<summary>
         //1:moveX 2:moveY 3:rotation 4:alpha 5:speed
         //</summary>
-        private void ReplaceEvent(RPEEvent eventToAdd, int baseIndex, int removeCount,ref List<RPEEvent> eventsToBeReplaced)
+        private void ReplaceEvent(RPEEvent eventToAdd, int baseIndex, int removeCount,out List<RPEEvent> eventsToBeReplaced)
         {
             eventsToBeReplaced.RemoveRange(baseIndex, removeCount);
             eventsToBeReplaced.Insert(baseIndex==0?0:baseIndex-1, eventToAdd);
