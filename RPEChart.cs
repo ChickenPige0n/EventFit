@@ -55,6 +55,19 @@ namespace EventFitter
             return 0;
         }
 
+        private double getTime(List<int> triple)
+        {
+            return triple[2] == 0 ? 0 : (double)triple[0] + ((double)triple[1] / (double)triple[2]);
+        }
+        public double getDuration()
+        {
+            return getTime(endTime)-getTime(startTime);
+        }
+        public double getVelocity()
+        {
+            return (end-start)/getDuration();
+        }
+
         public float easingLeft { get; set; }
         public float easingRight { get; set; }
         public int easingType { get; set; }

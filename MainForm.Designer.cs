@@ -107,9 +107,10 @@
             this.eventTypeLabel.Font = new System.Drawing.Font("Microsoft YaHei UI", 18F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.eventTypeLabel.Location = new System.Drawing.Point(3, 55);
             this.eventTypeLabel.Name = "eventTypeLabel";
-            this.eventTypeLabel.Size = new System.Drawing.Size(140, 31);
+            this.eventTypeLabel.Size = new System.Drawing.Size(118, 31);
             this.eventTypeLabel.TabIndex = 1;
-            this.eventTypeLabel.Text = "EventType:";
+            this.eventTypeLabel.Text = "EventIdx:";
+            this.eventTypeLabel.Click += new System.EventHandler(this.eventTypeLabel_Click);
             // 
             // lineIndexLabel
             // 
@@ -121,6 +122,7 @@
             this.lineIndexLabel.Size = new System.Drawing.Size(130, 31);
             this.lineIndexLabel.TabIndex = 0;
             this.lineIndexLabel.Text = "LineIndex:";
+            this.lineIndexLabel.Click += new System.EventHandler(this.lineIndexLabel_Click);
             // 
             // pictureBox1
             // 

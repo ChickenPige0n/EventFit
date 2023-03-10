@@ -6,11 +6,14 @@ using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Reflection;
 using System.Text;
+using System.Text.Unicode;
 
 namespace EventFitter
 {
     public partial class MainForm : Form
     {
+        const double PRECISION = 3.0;
+
         int lineIndex;
 
         RPEChart? chart;
@@ -97,86 +100,175 @@ namespace EventFitter
                     Events = chart.judgeLineList[lineIndex].eventLayers[0].alphaEvents;
                     break;
             }
+
+
             
-            int baseIndex = 0;
-
-            double precision = 1;
 
 
-            int indexStepLength = 1;
-            int maxWindowLength = 128;
-            int originWindowLength = 3;
+            //RemoveRange 包括index上的事件
 
-
-
-            int fitWindowLength = originWindowLength;
-
-
-
-
-            while (baseIndex < Events.Count)
+            //移除静态事件
+            int i;
+            for (i = 1; i < Events.Count - 1; i++)
             {
-                int i;
-                for (i = 1; i + baseIndex < Events.Count - 1; i++)
+                if (Events[i].GetMontonicity() == 0 && (Events[i - 1].end == Events[i].start))
                 {
-                    if (Events[baseIndex + i].GetMontonicity() == 0 && (Events[baseIndex + i - 1].end == Events[baseIndex + i].start))
+                    Events.RemoveRange(i, 1);
+                    i -= 1;
+                }
+            }
+
+
+            if (Events.Count <= 5)
+            {
+                return;
+            }
+
+
+
+            List<int[]> cuttedEventsIndex = new List<int[]> { };
+
+            int baseIndex = 0;
+            int Length;
+
+            //选出单调性突变的事件组
+            
+            int lastMontonicity;
+            for (Length = 1;baseIndex+Length<Events.Count; Length++)
+            {
+                lastMontonicity = Events[baseIndex+Length-1].GetMontonicity();
+                if (Events[baseIndex + Length].GetMontonicity()!=lastMontonicity||Math.Abs(getTime(Events[baseIndex + Length].startTime) - getTime(Events[baseIndex + Length-1].endTime))>0.1)
+                {
+                    eventTypeLabel.Text = baseIndex + "/" + baseIndex+Length;
+                    cuttedEventsIndex.Add(new int[2] {baseIndex, baseIndex+Length-1});
+
+                    baseIndex += Length;
+                    Length = 0;
+                }
+            }
+            cuttedEventsIndex.Add(new int[2] { baseIndex, Events.Count - 1 });
+
+            
+
+
+            for (int ii = 0;ii < cuttedEventsIndex.Count;ii++)
+            {
+                int[] indexes = cuttedEventsIndex[ii];
+
+
+                double velDiff;
+                int lastVelocityChange;
+                int curVelocityChange;
+                for (int idx = indexes[0]+1; idx < indexes[1]&& idx + 1 < Events.Count; idx++)
+                {
+                    velDiff = Events[idx].getVelocity() - Events[idx - 1].getVelocity();
+                    //与idx-1相比idx事件在加速
+                    if(velDiff>0)
                     {
-                        Events.RemoveRange(baseIndex + i, 1);
+                        lastVelocityChange = 1;
+                    }
+                    //在减速
+                    else if (velDiff < 0)
+                    {
+                        lastVelocityChange = -1;
+                    }
+                    else
+                    {
+                        lastVelocityChange = 0;
+                    }
+                    velDiff = Events[idx+1].getVelocity() - Events[idx].getVelocity();
+                    //与idx相比idx+1事件在加速
+                    if (velDiff > 0)
+                    {
+                        curVelocityChange = 1;
+                    }
+                    //在减速
+                    else if (velDiff < 0)
+                    {
+                        curVelocityChange = -1;
+                    }
+                    else
+                    {
+                        curVelocityChange = 0;
+                    }
+
+
+                    if (lastVelocityChange != curVelocityChange && Math.Abs(lastVelocityChange)>=0.05)
+                    {
+                        // 0   1 2 3 4 5
+                        //   ↑
+                        //insert 1:
+                        //分割
+                        
+                        cuttedEventsIndex.Insert(ii, new int[2] { indexes[0], idx });
+                        cuttedEventsIndex.Insert(ii + 1, new int[2] { idx + 1, indexes[1] });
+                        cuttedEventsIndex.RemoveAt(ii+2);
+                        //ii += 1;
+                        break;
                     }
                 }
+            }
 
 
-                double[] values;
-                double[] beatTimes;
-                double beatTimeRange;
-                GetEventInRange(Events, baseIndex, fitWindowLength, out values, out beatTimes, out beatTimeRange);
+            //根据加速度划分完毕 开始拟合
+            for(int ie = cuttedEventsIndex.Count-1;ie>=0;ie--)
+            {
+                int[] evtIdxs = cuttedEventsIndex[ie];
+                eventTypeLabel.Text = evtIdxs[0] + "/" + evtIdxs[1];
+                NiheInRange(ref evtIdxs[0], evtIdxs[1] - evtIdxs[0] + 1,ref Events);
+            }
+        }
 
-                int EaseIndex = TryFitInRange(values, beatTimes, beatTimeRange, precision);
-                if (EaseIndex != -1)
-                {
-                    RPEEvent fittedEvent = new RPEEvent();
-                    fittedEvent.start = Events[baseIndex].start;
-                    fittedEvent.end = Events[baseIndex + fitWindowLength - 1].end;
-                    fittedEvent.startTime = Events[baseIndex].startTime;
-                    fittedEvent.endTime = Events[baseIndex + fitWindowLength - 1].endTime;
-                    fittedEvent.easingType = EaseIndex;
 
-                    ReplaceEvent(fittedEvent, baseIndex, fitWindowLength, ref Events);
-                    baseIndex += 1;
-                    fitWindowLength = originWindowLength;
+        private void NiheInRange(ref int baseIndex,int Length,ref List<RPEEvent> Events)
+        {
+            if (baseIndex < 0)
+            {
+                baseIndex = 0;
+            }
+            double[] values;
+            double[] beatTimes;
+            double beatTimeRange;
 
-                }
-                else if (fitWindowLength < maxWindowLength)
-                {
-                    fitWindowLength += 4;
-                }
-                else
-                {
-                    baseIndex += indexStepLength;
-                    fitWindowLength = originWindowLength;
-                }
+            GetEventInRange(ref Events, baseIndex, Length, out values, out beatTimes, out beatTimeRange);
+
+            int EaseIndex = CalcEaseWithValues(values, beatTimes, beatTimeRange, PRECISION);
+
+            if (EaseIndex != -1)
+            {
+                RPEEvent fittedEvent = new RPEEvent();
+                fittedEvent.start = Events[baseIndex].start;
+                fittedEvent.end = Events[baseIndex + Length - 1].end;
+                fittedEvent.startTime = Events[baseIndex].startTime;
+                fittedEvent.endTime = Events[baseIndex + Length - 1].endTime;
+                fittedEvent.easingType = EaseIndex;
+
+                ReplaceEvent(fittedEvent, baseIndex, Length, ref Events);
 
             }
         }
 
-        private void GetEventInRange(List<RPEEvent> Events, int baseIndex, int eventCount, out double[] values, out double[] beatTimes, out double beatTimeRange)
+
+
+
+
+        private void GetEventInRange(ref List<RPEEvent> Events, int baseIndex, int eventCount, out double[] values, out double[] beatTimes, out double beatTimeRange)
         {
-            double endTime;
-            double startTime;
-            values = new double[eventCount];
+            values = new double[eventCount + 1];
             beatTimes = new double[eventCount];
-            beatTimeRange = -getTime(Events[baseIndex].startTime)
-                +
-                getTime(Events[baseIndex + eventCount - 1].endTime);
+
             for (int outIndex = baseIndex; outIndex < baseIndex + eventCount; outIndex++)
             {
+                // 获取当前事件的start值和前一个事件到当前事件的duration
                 values[outIndex - baseIndex] = Events[outIndex].start;
-                endTime = getTime(Events[outIndex].endTime);
-                startTime = getTime(Events[outIndex].startTime);
-                beatTimes[outIndex - baseIndex] = endTime - startTime;
+                beatTimes[outIndex - baseIndex] = 0.00;//outIndex == baseIndex ? 0.03125d : Events[outIndex - 1].getDuration();
             }
 
-            values[eventCount - 1] = Events[baseIndex + eventCount - 1].end;
+            // 最后一个事件的end值存储到values数组的最后一个位置
+            values[^1] = Events[baseIndex + eventCount - 1].end;
+
+            // 计算beatTimeRange
+            beatTimeRange = getTime(Events[baseIndex + eventCount - 1].endTime) - getTime(Events[baseIndex].startTime);
         }
 
         //<summary>
@@ -192,8 +284,17 @@ namespace EventFitter
 
 
 
-        public int TryFitInRange(double[] values, double[] beatTimes, double beatTimeRange,double precision)
+        public int CalcEaseWithValues(double[] values, double[] beatTimes, double beatTimeRange,double precision)
         {
+            StreamWriter sw = new StreamWriter("C:\\Users\\23369\\Desktop\\events.txt", true, new UTF8Encoding(false));
+            sw.Write("\n\n");
+            for (int i = 0;i<beatTimes.Length;i++)
+            {
+                beatTimes[i] = 0.00;
+                sw.Write("\nvalue:" + values[i] + "\nbeat time:" + beatTimes[i] + "\n");
+            }
+            sw.Write("\nlatest value:"+values[^1]+"\n");
+            sw.Close();
 
             RPEPoints = new Point[values.Length];
             calcPoints = new Point[values.Length];
@@ -204,50 +305,51 @@ namespace EventFitter
 
             for(int easingIndex = 1; easingIndex <= 28; easingIndex++)
             {
-                double curBeat = 0;
+                double curBeaty = 0.0312;//beatTimes[0];
                 double calcValue = 0;
                 successFlag = true;
                 int i;
-                for (i = 0; i < values.Length; i++)
+                for (i = 1; i < beatTimes.Length; i++)
                 {
-                    calcValue = values[0] + (Easings.easeFuncs[easingIndex - 1](curBeat / beatTimeRange) * valueRange);
 
+                    calcValue = values[0] + (Easings.easeFuncs[easingIndex - 1](curBeaty / beatTimeRange) * valueRange);
 
-                    RPEPoints[i] = new Point
+                    if (Math.Abs(calcValue - values[i]) > precision)
+                    {
+                        StreamWriter swe = new StreamWriter("C:\\Users\\23369\\Desktop\\events.txt", true, new UTF8Encoding(false));
+                        swe.Write("\n\neasing:"+ easingIndex +"\n  calculated value:" + calcValue +"\n  actural:" + values[i]);
+                        swe.Close();
+                        successFlag = false;
+                        break;
+                    }
+
+                    if (i < (beatTimes.Length - 1))
+                    {
+                        curBeaty += 0.0312;//beatTimes[i];
+                    }
+
+                    RPEPoints[i-1] = new Point
                         (
-                            25 + (int)Math.Abs((curBeat / beatTimeRange)*250),
-                            25 + (int)Math.Abs(values[i] / valueRange*250)
+                            25 + (int)((curBeaty / beatTimeRange)*250),
+                            25 + (int)((values[i] - values[0]) / valueRange * 250)
                         );
-                    calcPoints[i] = new Point
+                    calcPoints[i-1] = new Point
                         (
-                            25 + (int)Math.Abs((curBeat / beatTimeRange) * 250),
-                            25 + (int)Math.Abs(calcValue / valueRange * 250)
+                            25 + (int)((curBeaty / beatTimeRange) * 250),
+                            25 + (int)((calcValue - values[0]) / valueRange * 250)
                         );
                     drawCurve();
 
 
                     Update();
-                    
-                    if (Math.Abs(calcValue - values[i]) > precision)
-                    {
-                        successFlag = false;
-                        break;
-                    }
-                    if (i < (values.Length - 1))
-                    {
-                        curBeat += beatTimes[i];
-                    }
-                    
                 }
                 if (successFlag)
                 {
-
-                    Thread.Sleep(1000);
                     return easingIndex;
                 }
             }
 
-            return successIndex;
+            return successIndex;//-1
         }
 
         void Main_Paint(object sender,PaintEventArgs e)
@@ -255,59 +357,74 @@ namespace EventFitter
             //drawCurve();
         }
 
-        
+
+
         private void drawCurve()
         {
-            Update();
-            Graphics g = pictureBox1.CreateGraphics();
-            g.SmoothingMode = SmoothingMode.AntiAlias; //使绘图质量最高，即消除锯齿
-            g.PixelOffsetMode= PixelOffsetMode.HighSpeed;
-            //g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            //g.CompositingQuality = CompositingQuality.HighQuality;
-            
-            g.Clear(Color.White);
+            // 为控件创建绘图缓存区位图
+            Bitmap backBuffer = new Bitmap(pictureBox1.ClientSize.Width, pictureBox1.ClientSize.Height);
 
-            Pen p = new(Color.White, 5);
-            //from 255 237 70 to 255 126 199
-            //from 143 255 133 to 57 160 255
-            
-            int i = 0;
-            foreach (var b in RPEPoints)
+            // 双缓冲技术
+            using (Graphics g = Graphics.FromImage(backBuffer))
             {
-                try
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.PixelOffsetMode = PixelOffsetMode.HighSpeed;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.CompositingQuality = CompositingQuality.HighQuality;
+
+                // 绘制前，先用背景刷刷新图像
+                g.Clear(Color.White);
+
+                Pen p = new Pen(Color.White, 5);
+                int i = 0;
+                foreach (var b in RPEPoints)
                 {
-                    if (RPEPoints[i + 1].X != 0 && RPEPoints[i + 1].Y != 0)
+                    try
                     {
-                        p.Color = Color.FromArgb(255, 237 - (int)(111 * i / RPEPoints.Length - 1), 70 + (int)(129 * i / RPEPoints.Length - 1));
-                        g.DrawLine(p, b, RPEPoints[i + 1]);
+                        if (RPEPoints[i + 1].X != 0 && RPEPoints[i + 1].Y != 0)
+                        {
+                            p.Color = Color.FromArgb(255, 237 - (int)(111 * i / RPEPoints.Length - 1), 70 + (int)(129 * i / RPEPoints.Length - 1));
+                            g.DrawLine(p, b, RPEPoints[i + 1]);
+                        }
+                        if (calcPoints[i + 1].X != 0 && calcPoints[i + 1].Y != 0)
+                        {
+                            p.Color = Color.FromArgb(143 - (int)(86 * i / RPEPoints.Length - 1), 253 - (int)(95 * i / RPEPoints.Length - 1), 133 + (int)(122 * i / RPEPoints.Length - 1));
+                            g.DrawLine(p, calcPoints[i], calcPoints[i + 1]);
+                        }
                     }
-                    if (calcPoints[i + 1].X != 0 && calcPoints[i + 1].Y != 0)
+                    catch (Exception e)
                     {
-                        p.Color = Color.FromArgb(143 - (int)(86 * i / RPEPoints.Length - 1), 253 - (int)(95 * i / RPEPoints.Length - 1), 133 + (int)(122 * i / RPEPoints.Length - 1));
-                        g.DrawLine(p, calcPoints[i], calcPoints[i + 1]);
+                        Console.WriteLine(e.StackTrace);
                     }
-                }catch (OverflowException e)
-                {
-                    Console.WriteLine(e.StackTrace);
+                    if (i < RPEPoints.Length - 2)
+                    {
+                        i++;
+                    }
                 }
-                if (i < RPEPoints.Length - 2)
-                {
-                    i++;
-                }
+
+                // 注意释放 Pen 对象
+                p.Dispose();
+                // 使用 Graphics 对象的 DrawImage 将缓存中的位图复制到屏幕上
+                pictureBox1.Image = backBuffer;
             }
 
-            g.Dispose();
-            p.Dispose();
         }
-        
-
-
         private void MainForm_Load(object sender, EventArgs e)
         {
 
         }
 
         private void baseIndexLabel_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void lineIndexLabel_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void eventTypeLabel_Click(object sender, EventArgs e)
         {
 
         }
