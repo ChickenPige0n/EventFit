@@ -28,6 +28,12 @@ namespace EventFitter
     }
     public class AlphaControlItem
     {
+        public AlphaControlItem(float xx)
+        {
+            alpha = 1.0f;
+            easing = 1;
+            x = xx;
+        }
         public float alpha { get; set; }
         public int easing { get; set; }
         public float x { get; set; }
@@ -95,6 +101,18 @@ namespace EventFitter
     }
     public class Extended
     {
+        public Extended() {
+            RPEEvent defaultInc = new RPEEvent();
+            defaultInc.start = 0.0f;
+            defaultInc.end = 0.0f;
+            defaultInc.easingType = 1;
+            defaultInc.startTime = new List<int> { 0, 0, 1 };
+            defaultInc.endTime = new List<int> { 1, 0, 1 };
+            inclineEvents = new List<RPEEvent>
+            {
+                defaultInc
+            };
+        }
         public List<RPEEvent> inclineEvents { get; set; }
     }
     public class NotesItem
@@ -113,24 +131,48 @@ namespace EventFitter
     }
     public class PosControlItem
     {
+        public PosControlItem(float xx)
+        {
+            pos = 1.0f;
+            easing = 1;
+            x = xx;
+        }
         public int easing { get; set; }
         public float pos { get; set; }
         public float x { get; set; }
     }
     public class SizeControlItem
     {
+        public SizeControlItem(float xx)
+        {
+            size = 1.0f;
+            easing = 1;
+            x = xx;
+        }
         public int easing { get; set; }
         public float size { get; set; }
         public float x { get; set; }
     }
     public class SkewControlItem
     {
+        public SkewControlItem(float xx)
+        {
+            skew = 0.0f;
+            easing = 1;
+            x = xx;
+        }
         public int easing { get; set; }
         public float skew { get; set; }
         public float x { get; set; }
     }
     public class YControlItem
     {
+        public YControlItem(float xx)
+        {
+            y = 1.0f;
+            easing = 1;
+            x = xx;
+        }
         public int easing { get; set; }
         public float x { get; set; }
         public float y { get; set; }

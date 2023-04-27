@@ -12,7 +12,7 @@ namespace EventFitter
 {
     public partial class MainForm : Form
     {
-        const double PRECISION = 3.0;
+        const double PRECISION = 1.0;
 
         int lineIndex;
 
@@ -60,6 +60,31 @@ namespace EventFitter
 
             for (lineIndex = 0; lineIndex < lineCount; lineIndex++)
             {
+                chart.judgeLineList[lineIndex].father = -1;
+
+
+                chart.judgeLineList[lineIndex].extended = new Extended();
+
+                chart.judgeLineList[lineIndex].alphaControl = new List<AlphaControlItem>();
+                chart.judgeLineList[lineIndex].alphaControl.Add(new AlphaControlItem(0.0f));
+                chart.judgeLineList[lineIndex].alphaControl.Add(new AlphaControlItem(9999999.0f));
+
+                chart.judgeLineList[lineIndex].posControl = new List<PosControlItem>();
+                chart.judgeLineList[lineIndex].posControl.Add(new PosControlItem(0.0f));
+                chart.judgeLineList[lineIndex].posControl.Add(new PosControlItem(9999999.0f));
+
+                chart.judgeLineList[lineIndex].sizeControl = new List<SizeControlItem>();
+                chart.judgeLineList[lineIndex].sizeControl.Add(new SizeControlItem(0.0f));
+                chart.judgeLineList[lineIndex].sizeControl.Add(new SizeControlItem(9999999.0f));
+
+                chart.judgeLineList[lineIndex].skewControl = new List<SkewControlItem>();
+                chart.judgeLineList[lineIndex].skewControl.Add(new SkewControlItem(0.0f));
+                chart.judgeLineList[lineIndex].skewControl.Add(new SkewControlItem(9999999.0f));
+
+                chart.judgeLineList[lineIndex].yControl = new List<YControlItem>();
+                chart.judgeLineList[lineIndex].yControl.Add(new YControlItem(0.0f));
+                chart.judgeLineList[lineIndex].yControl.Add(new YControlItem(9999999.0f));
+
                 StartFitInLineAndType(1);
                 StartFitInLineAndType(2);
                 StartFitInLineAndType(3);
@@ -69,7 +94,7 @@ namespace EventFitter
             g.Clear(Color.White);
             g.Dispose();
             UTF8Encoding utf8 = new UTF8Encoding(false);
-            StreamWriter sw = new StreamWriter("C:\\Users\\23369\\Desktop\\114514.json", false, utf8);
+            StreamWriter sw = new StreamWriter("C:\\Users\\23369\\Desktop\\86022134.json", false, utf8);
             sw.Write(JsonConvert.SerializeObject(chart));
             sw.Close();
         }
@@ -261,7 +286,7 @@ namespace EventFitter
             {
                 // 获取当前事件的start值和前一个事件到当前事件的duration
                 values[outIndex - baseIndex] = Events[outIndex].start;
-                beatTimes[outIndex - baseIndex] = 0.00;//outIndex == baseIndex ? 0.03125d : Events[outIndex - 1].getDuration();
+                beatTimes[outIndex - baseIndex] = Events[outIndex].getDuration();
             }
 
             // 最后一个事件的end值存储到values数组的最后一个位置
@@ -277,7 +302,7 @@ namespace EventFitter
         private void ReplaceEvent(RPEEvent eventToAdd, int baseIndex, int removeCount,ref List<RPEEvent> eventsToBeReplaced)
         {
             eventsToBeReplaced.RemoveRange(baseIndex, removeCount);
-            eventsToBeReplaced.Insert(baseIndex==0?0:baseIndex-1, eventToAdd);
+            eventsToBeReplaced.Insert(baseIndex, eventToAdd);
         }
 
 
@@ -286,15 +311,6 @@ namespace EventFitter
 
         public int CalcEaseWithValues(double[] values, double[] beatTimes, double beatTimeRange,double precision)
         {
-            StreamWriter sw = new StreamWriter("C:\\Users\\23369\\Desktop\\events.txt", true, new UTF8Encoding(false));
-            sw.Write("\n\n");
-            for (int i = 0;i<beatTimes.Length;i++)
-            {
-                beatTimes[i] = 0.00;
-                sw.Write("\nvalue:" + values[i] + "\nbeat time:" + beatTimes[i] + "\n");
-            }
-            sw.Write("\nlatest value:"+values[^1]+"\n");
-            sw.Close();
 
             RPEPoints = new Point[values.Length];
             calcPoints = new Point[values.Length];
@@ -305,38 +321,35 @@ namespace EventFitter
 
             for(int easingIndex = 1; easingIndex <= 28; easingIndex++)
             {
-                double curBeaty = 0.0312;//beatTimes[0];
+                double curBeat = beatTimes[0];
                 double calcValue = 0;
                 successFlag = true;
                 int i;
                 for (i = 1; i < beatTimes.Length; i++)
                 {
 
-                    calcValue = values[0] + (Easings.easeFuncs[easingIndex - 1](curBeaty / beatTimeRange) * valueRange);
+                    calcValue = values[0] + (Easings.easeFuncs[easingIndex - 1](curBeat / beatTimeRange) * valueRange);
 
                     if (Math.Abs(calcValue - values[i]) > precision)
                     {
-                        StreamWriter swe = new StreamWriter("C:\\Users\\23369\\Desktop\\events.txt", true, new UTF8Encoding(false));
-                        swe.Write("\n\neasing:"+ easingIndex +"\n  calculated value:" + calcValue +"\n  actural:" + values[i]);
-                        swe.Close();
                         successFlag = false;
                         break;
                     }
 
                     if (i < (beatTimes.Length - 1))
                     {
-                        curBeaty += 0.0312;//beatTimes[i];
+                        curBeat += beatTimes[i];
                     }
 
                     RPEPoints[i-1] = new Point
                         (
-                            25 + (int)((curBeaty / beatTimeRange)*250),
-                            25 + (int)((values[i] - values[0]) / valueRange * 250)
+                            25 + (int)((curBeat / beatTimeRange)*250),
+                            275 - (int)((values[i] - values[0]) / valueRange * 250)
                         );
                     calcPoints[i-1] = new Point
                         (
-                            25 + (int)((curBeaty / beatTimeRange) * 250),
-                            25 + (int)((calcValue - values[0]) / valueRange * 250)
+                            25 + (int)((curBeat / beatTimeRange) * 250),
+                            275 - (int)((calcValue - values[0]) / valueRange * 250)
                         );
                     drawCurve();
 
