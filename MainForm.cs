@@ -12,6 +12,8 @@ namespace EventFitter
 {
     public partial class MainForm : Form
     {
+        private string filePath = "null";
+
         const double PRECISION = 1.0;
 
         int lineIndex;
@@ -39,20 +41,17 @@ namespace EventFitter
              { 
                 string ChartContent = File.ReadAllText(ofd.FileName);
                 chart = JsonConvert.DeserializeObject<RPEChart>(ChartContent);
-
+                filePath = ofd.FileName;
                 //startFitting();
             }
         }
 
-        private void FitButton_Click(object sender, EventArgs e)
+        private async void FitButton_Click(object sender, EventArgs e)
         {
-            if(chart != null)
-            {
-                startFitting();
-            }
+            startFitting();
         }
 
-        
+
 
         public void startFitting()
         {
@@ -94,7 +93,12 @@ namespace EventFitter
             g.Clear(Color.White);
             g.Dispose();
             UTF8Encoding utf8 = new UTF8Encoding(false);
-            StreamWriter sw = new StreamWriter("C:\\Users\\23369\\Desktop\\86022134.json", false, utf8);
+
+            string fileName = Path.GetFileNameWithoutExtension(filePath);
+            string newFileName = fileName + "_拟合完毕";
+            string newFilePath = Path.Combine(Path.GetDirectoryName(filePath), newFileName + Path.GetExtension(filePath));
+
+            StreamWriter sw = new StreamWriter(newFilePath, false, utf8);
             sw.Write(JsonConvert.SerializeObject(chart));
             sw.Close();
         }
@@ -142,7 +146,7 @@ namespace EventFitter
                     i -= 1;
                 }
             }
-
+            
 
             if (Events.Count <= 5)
             {
@@ -182,35 +186,44 @@ namespace EventFitter
 
 
                 double velDiff;
-                int lastVelocityChange;
-                int curVelocityChange;
-                for (int idx = indexes[0]+1; idx < indexes[1]&& idx + 1 < Events.Count; idx++)
+                int lastVelocityChange = 0;
+                int curVelocityChange = 0;
+                for (int idx = indexes[0] + 1; idx < indexes[1] && idx + 1 < Events.Count; idx++)
                 {
                     velDiff = Events[idx].getVelocity() - Events[idx - 1].getVelocity();
-                    //与idx-1相比idx事件在加速
-                    if(velDiff>0)
+
+
+                    //加速度
+                    if (Math.Abs( velDiff ) >= 0.01)
                     {
-                        lastVelocityChange = 1;
-                    }
-                    //在减速
-                    else if (velDiff < 0)
-                    {
-                        lastVelocityChange = -1;
+                        if (velDiff > 0)
+                        {
+                            lastVelocityChange = 1;
+                        }
+                        else if (velDiff < 0)
+                        {
+                            lastVelocityChange = -1;
+                        }
                     }
                     else
                     {
                         lastVelocityChange = 0;
                     }
+
+
                     velDiff = Events[idx+1].getVelocity() - Events[idx].getVelocity();
-                    //与idx相比idx+1事件在加速
-                    if (velDiff > 0)
+                    
+
+                    if (Math.Abs(velDiff) >= 0.01)
                     {
-                        curVelocityChange = 1;
-                    }
-                    //在减速
-                    else if (velDiff < 0)
-                    {
-                        curVelocityChange = -1;
+                        if (velDiff > 0)
+                        {
+                            curVelocityChange = 1;
+                        }
+                        else if (velDiff < 0)
+                        {
+                            curVelocityChange = -1;
+                        }
                     }
                     else
                     {
@@ -220,11 +233,6 @@ namespace EventFitter
 
                     if (lastVelocityChange != curVelocityChange && Math.Abs(lastVelocityChange)>=0.05)
                     {
-                        // 0   1 2 3 4 5
-                        //   ↑
-                        //insert 1:
-                        //分割
-                        
                         cuttedEventsIndex.Insert(ii, new int[2] { indexes[0], idx });
                         cuttedEventsIndex.Insert(ii + 1, new int[2] { idx + 1, indexes[1] });
                         cuttedEventsIndex.RemoveAt(ii+2);
