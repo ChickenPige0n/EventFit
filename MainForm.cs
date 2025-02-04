@@ -319,7 +319,10 @@ namespace EventFitter
 
         public int CalcEaseWithValues(double[] values, double[] beatTimes, double beatTimeRange,double precision)
         {
-
+            if (values.Length < 4)
+            {
+                return -1;
+            }
             RPEPoints = new Point[values.Length];
             calcPoints = new Point[values.Length];
 
@@ -327,7 +330,7 @@ namespace EventFitter
             bool successFlag;
             int successIndex = -1;
 
-            for(int easingIndex = 1; easingIndex <= 28; easingIndex++)
+            for(int easingIndex = 1; easingIndex <= 20; easingIndex++)
             {
                 double curBeat = beatTimes[0];
                 double calcValue = 0;
