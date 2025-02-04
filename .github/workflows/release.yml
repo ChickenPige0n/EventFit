@@ -31,7 +31,14 @@ jobs:
       # 5. 发布项目
       - name: Publish project
         run: dotnet publish -c Release -o ./publish
-
+        
+      - name: Zip artifacts
+        shell: pwsh
+        run: |
+          $publishPath = Resolve-Path "./publish"
+          Compress-Archive -Path "$publishPath/*" -DestinationPath "./release.zip"
+          Write-Output "ZIP file size: $( (Get-Item ./release.zip).Length /1MB ) MB"
+          
       # 6. 创建 GitHub Release
       - name: Create Release
         id: create_release
@@ -51,6 +58,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用上一步的 Release URL
-          asset_path: ./publish/**/* # 上传发布目录中的所有文件
-          asset_name: release.zip # 打包为 zip 文件
+          asset_path: ./release.zip
+          asset_name: release.zip
           asset_content_type: application/zip
