@@ -1,0 +1,56 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*' # 匹配以 'v' 开头的标签，例如 v1.0.0
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest # 使用 Windows 环境构建 .NET 项目
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 设置 .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6.0.x
+
+      # 3. 恢复 NuGet 包
+      - name: Restore dependencies
+        run: dotnet restore
+
+      # 4. 构建项目
+      - name: Build project
+        run: dotnet build --configuration Release
+
+      # 5. 发布项目
+      - name: Publish project
+        run: dotnet publish -c Release -o ./publish
+
+      # 6. 创建 GitHub Release
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用 GitHub 提供的 token
+        with:
+          tag_name: ${{ github.ref_name }} # 使用触发工作流的标签
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      # 7. 上传发布文件
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用上一步的 Release URL
+          asset_path: ./publish/**/* # 上传发布目录中的所有文件
+          asset_name: release.zip # 打包为 zip 文件
+          asset_content_type: application/zip
