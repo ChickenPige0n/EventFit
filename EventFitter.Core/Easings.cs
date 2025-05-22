@@ -212,10 +212,10 @@ namespace EventFitter
             new EasingFunc(EaseInExpo),
             new EasingFunc(EaseOutCirc),
             new EasingFunc(EaseInCirc),
-            //new EasingFunc(EaseOutBack),//20
-            //new EasingFunc(EaseInBack),
+            new EasingFunc(EaseOutBack), // Re-enabled
+            new EasingFunc(EaseInBack),  // Re-enabled
             new EasingFunc(EaseInOutCirc),
-            //new EasingFunc(EaseInOutBack),
+            new EasingFunc(EaseInOutBack) // Re-enabled
             //new EasingFunc(EaseOutElastic),
             //new EasingFunc(EaseInElastic),//25
             //new EasingFunc(EaseOutBounce),
