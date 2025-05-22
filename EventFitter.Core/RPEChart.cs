@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 //generated automatically
 
-namespace EventFitter
+namespace EventFitter.Core
 {
 
     public class BPMListItem

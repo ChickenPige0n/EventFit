@@ -7,21 +7,23 @@ using System.Drawing.Drawing2D;
 using System.Reflection;
 using System.Text;
 using System.Text.Unicode;
+using EventFitter.Core; // Added using statement
 
 namespace EventFitter
 {
     public partial class MainForm : Form
     {
+        private ChartFitter? _chartFitter; // Added field
         private string filePath = "null";
 
-        const double PRECISION = 1.0;
+        // const double PRECISION = 1.0; // Moved to ChartFitter
 
-        int lineIndex;
+        // int lineIndex; // Moved to ChartFitter
 
-        RPEChart? chart;
+        RPEChart? chart; // Stays in MainForm, as it's responsible for loading
 
-        Point[] RPEPoints =  { new Point(0,0), new Point(0, 0) };
-        Point[] calcPoints = { new Point(0,0), new Point(0, 0) };
+        // Point[] RPEPoints =  { new Point(0,0), new Point(0, 0) }; // Moved to ChartFitter
+        // Point[] calcPoints = { new Point(0,0), new Point(0, 0) }; // Moved to ChartFitter
 
         public MainForm()
         {
@@ -33,22 +35,43 @@ namespace EventFitter
             OpenFileDialog ofd = new OpenFileDialog();
              ofd.InitialDirectory = Application.StartupPath;
              ofd.Title = "Please choose the chart to be fitted";
-             ofd.Multiselect = true;
+             ofd.Multiselect = true; // Should be false if only one file is processed
              ofd.Filter = "RPE Chart|*.json";
-             ofd.FilterIndex = 2;
+             ofd.FilterIndex = 2; // Or 1 if it's the first/only filter
              ofd.RestoreDirectory = true;
              if (ofd.ShowDialog() == DialogResult.OK)
              { 
                 string ChartContent = File.ReadAllText(ofd.FileName);
                 chart = JsonConvert.DeserializeObject<RPEChart>(ChartContent);
                 filePath = ofd.FileName;
-                //startFitting();
+                //startFitting(); // Original call commented out
+
+                // Instantiate and initialize _chartFitter
+                _chartFitter = new ChartFitter();
+                _chartFitter.chart = this.chart;
+                _chartFitter.filePath = this.filePath;
+                // _chartFitter will use its own RPEPoints and calcPoints by default.
+                // If MainForm's arrays should be used, they need to be assigned:
+                // _chartFitter.RPEPoints = this.RPEPoints;
+                // _chartFitter.calcPoints = this.calcPoints;
             }
         }
 
         private async void FitButton_Click(object sender, EventArgs e)
         {
-            startFitting();
+            if (_chartFitter != null && _chartFitter.chart != null)
+            {
+                // It's good practice to run potentially long operations on a background thread
+                // to keep the UI responsive.
+                FitButton.Enabled = false; // Disable button during operation
+                await Task.Run(async () => await _chartFitter.startFitting());
+                FitButton.Enabled = true; // Re-enable button
+                MessageBox.Show("Fitting complete (using ChartFitter)!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("ChartFitter is not initialized or chart data is missing.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
 
@@ -84,10 +107,10 @@ namespace EventFitter
                 chart.judgeLineList[lineIndex].yControl.Add(new YControlItem(0.0f));
                 chart.judgeLineList[lineIndex].yControl.Add(new YControlItem(9999999.0f));
 
-                StartFitInLineAndType(1);
-                StartFitInLineAndType(2);
-                StartFitInLineAndType(3);
-                StartFitInLineAndType(4);
+                // StartFitInLineAndType(1); // Call to moved method, commented out
+                // StartFitInLineAndType(2); // Call to moved method, commented out
+                // StartFitInLineAndType(3); // Call to moved method, commented out
+                // StartFitInLineAndType(4); // Call to moved method, commented out
             }
             Graphics g = CreateGraphics();
             g.Clear(Color.White);
